@@ -126,17 +126,197 @@ df_all_participants.tail()
 
 # %%
 df_all_participants.head()
-# Análise e tratamento de Outliers: o objectivo será identificar e tratar outliers no dataset usando diferentes abordagens univariável e multivariável.  Para o efeito iremos os módulos dos vectores aceleração, giroscópio e magnetómetro. Seja 
 
-# o vector aceleração, giroscópio e magnetómetro. O respectivo módulo é determinado recorrendo:
+# %%
+# Export CSV
+df_all_participants.to_csv('all_participants_data.csv', index=False)
 
-# 🖮 Elabore uma rotina que apresente simultaneamente o boxplot de cada atividade (coluna 12 – eixo horizontal)  relativo a todos os sujeitos e a uma das seguintes variáveis transformadas: módulo do vector de aceleração, módulo do vector de giroscópio e módulo do vector de magnetómetro). Sugere-se o uso da biblioteca matplotlib. 
-# 🖎 Analise e comente a densidade de Outliers existentes no dataset transformado, isto é, nos módulos dos vectores aceleração, giroscópio e magnetómetro para cada atividade. Observe que a densidade é determinada recorrendo
+# %%
+#Load from CSV
+df_all_participants = pd.read_csv('all_participants_data.csv')
+print(df_all_participants.head())
 
+
+# %%
+def plot_boxplot_by_activity(df, variable):
+	plt.figure(figsize=(12, 6))
+	df.boxplot(column=variable, by='Activity Label', grid=False)
+	plt.title(f'Boxplot of {variable} by Activity Label')
+	plt.suptitle('')
+	plt.xlabel('Activity Label')
+	plt.ylabel(variable)
+	plt.show()
+
+# %%
+#Seaborn version of plot_boxplot_by_activity
+import seaborn as sns
+def plot_boxplot_by_activity_seaborn(df, variable):
+	plt.figure(figsize=(12, 6))
+	sns.boxplot(x='Activity Label', y=variable, data=df)
+	plt.title(f'Boxplot of {variable} by Activity Label')
+	plt.xlabel('Activity Label')
+	plt.ylabel(variable)
+	plt.show()
+
+# Exemplo de uso
+# Calcular o módulo do vector de aceleração
+df_all_participants['accel_magnitude'] = np.sqrt(df_all_participants['accel_x']**2 + df_all_participants['accel_y']**2 + df_all_participants['accel_z']**2)
+
+# Calcular o módulo do vector de giroscópio
+df_all_participants['gyro_magnitude'] = np.sqrt(df_all_participants['gyro_x']**2 + df_all_participants['gyro_y']**2 + df_all_participants['gyro_z']**2)
+
+# Calcular o módulo do vector de magnetómetro
+df_all_participants['magneto_magnitude'] = np.sqrt(df_all_participants['mag_x']**2 + df_all_participants['mag_y']**2 + df_all_participants['mag_z']**2)
+
+# Análise e tratamento de Outliers: o objectivo será identificar e tratar outliers no dataset usando diferentes abordagens univariável e multivariável.  Para o efeito iremos os módulos dos vectores aceleração, giroscópio e magnetómetro. 
+# Seja o vector aceleração, giroscópio e magnetómetro. O respectivo módulo é determinado recorrendo:
+
+# 🖮 Elabore uma rotina que apresente simultaneamente o boxplot de cada atividade (coluna 12 – eixo horizontal)  
+# relativo a todos os sujeitos e a uma das seguintes variáveis transformadas: módulo do vector de aceleração, 
+# módulo do vector de giroscópio e módulo do vector de magnetómetro). Sugere-se o uso da biblioteca matplotlib. 
+plot_boxplot_by_activity_seaborn(df_all_participants, 'accel_magnitude')
+plot_boxplot_by_activity_seaborn(df_all_participants, 'gyro_magnitude')
+plot_boxplot_by_activity_seaborn(df_all_participants, 'magneto_magnitude')
+
+#Analise e comente a densidade de Outliers existentes no dataset transformado, 
+# isto é, nos módulos dos vectores aceleração, giroscópio e magnetómetro 
+# para cada atividade. Observe que a densidade é determinada recorrendo
+# d = no/nr * 100
 # em que no é o número de pontos classificados como outliers e nr é o número total de pontos.
-# 🖮 Escreva uma rotina que receba um Array de amostras de uma variável e identifique os outliers usando o teste Z-Score para um k variável (parâmetro de entrada).
-# 🖎 Usando o Z-score implementado assinale todos as amostras consideradas outliers nos módulos dos vectores de aceleração, giroscópio e magnetómetro. Apresente plots em que estes pontos surgem a vermelho enquanto os restantes surgem a vermelho. Use k=3, 3.5 e 4.
+
+# %%
+def calculate_outlier_density(df, variable):
+	# Calcular Q1, Q3 e IQR
+	Q1 = df[variable].quantile(0.25)
+	Q3 = df[variable].quantile(0.75)
+	IQR = Q3 - Q1
+
+	# Definir limites para outliers
+	lower_bound = Q1 - 1.5 * IQR
+	upper_bound = Q3 + 1.5 * IQR
+
+	# Identificar outliers
+	outliers = df[(df[variable] < lower_bound) | (df[variable] > upper_bound)]
+	no = len(outliers)
+	nr = len(df)
+	density = (no / nr) * 100 if nr > 0 else 0
+	return no, nr, density
+
+# Uso
+variables = ['accel_magnitude', 'gyro_magnitude', 'magneto_magnitude']
+for var in variables:
+	no, nr, density = calculate_outlier_density(df_all_participants, var)
+	print(f'Variable: {var}, Outliers: {no}, Total: {nr}, Density: {density:.2f}%')
+
+
+
+# Dado que a accel_magnitude tem uma densidade de outliers significativamente maior,
+# vamos mudar o método de detecção de outliers para essa variável, dado que para 
+# esse tipo específico de sensor pode ser necessário limites mais flexíveis.
+
+
+# %%
+# 🖮 Escreva uma rotina que receba um Array de amostras de uma variável e identifique os outliers 
+# usando o teste Z-Score para um k variável (parâmetro de entrada).
+
+def detect_outliers_z_score(data, k):
+	mean = np.mean(data)
+	std_dev = np.std(data)
+	z_scores = (data - mean) / std_dev
+	outliers = np.where(np.abs(z_scores) > k)[0]
+	return outliers, z_scores
+
+
+# Exemplo de uso
+
+variables = ['accel_magnitude', 'gyro_magnitude', 'magneto_magnitude']
+
+for var in variables:
+	data = df_all_participants[var].values
+	k_values = [3, 3.5, 4]
+	for k in k_values:
+		outliers, z_scores = detect_outliers_z_score(data, k)
+		print(f'Variable: {var}, k={k}: Outliers detected: {len(outliers)}')
+
+
+# 🖎 Usando o Z-score implementado assinale todos as amostras consideradas outliers nos 
+# módulos dos vectores de aceleração, giroscópio e magnetómetro. 
+# Apresente plots em que estes pontos surgem a vermelho enquanto os restantes surgem a azul.
+#  Use k=3, 3.5 e 4.
+
+# %%
+# use seaborn for better plots, let's plot all three k for each variable in the same plot
+# x axis is the activity label, y axis is the variable value
+# blue points are normal, red points are outliers, use pastel colors
+# for each variavle plot all three k values in the same plot side by side
+
+#based on this one:
+
+# def plot_boxplot_by_activity_seaborn(df, variable):
+# 	plt.figure(figsize=(12, 6))
+# 	sns.boxplot(x='Activity Label', y=variable, data=df)
+# 	plt.title(f'Boxplot of {variable} by Activity Label')
+# 	plt.xlabel('Activity Label')
+# 	plt.ylabel(variable)
+# 	plt.show()
+
+import seaborn as sns
+def plot_outliers_by_activity_seaborn(df, variable, k_values):
+	plt.figure(figsize=(18, 6))
+	for i, k in enumerate(k_values):
+		plt.subplot(1, len(k_values), i + 1)
+		data = df[variable].values
+		outliers, z_scores = detect_outliers_z_score(data, k)
+		df['Outlier'] = 'Normal'
+		df.loc[outliers, 'Outlier'] = 'Outlier'
+		sns.scatterplot(x='Activity Label', y=variable, hue='Outlier', data=df, palette={'Normal': 'blue', 'Outlier': 'red'}, alpha=0.5)
+		plt.title(f'Outliers in {variable} (k={k})')
+		plt.xlabel('Activity Label')
+		plt.ylabel(variable)
+		plt.legend()
+	plt.tight_layout()
+	plt.show()
+
+variables = ['accel_magnitude', 'gyro_magnitude', 'magneto_magnitude']
+k_values = [3, 3.5, 4]
+for var in variables:
+	plot_outliers_by_activity_seaborn(df_all_participants, var, k_values)
+
+
+# %%
+# Plotar a distribuição de cada variavel
+def plot_distribution(df, variable):
+	plt.figure(figsize=(10, 6))
+	sns.histplot(df[variable], bins=50, kde=True)
+	plt.title(f'Distribution of {variable}')
+	plt.xlabel(variable)
+	plt.ylabel('Frequency')
+	plt.show()
+
+for var in variables:
+	plot_distribution(df_all_participants, var)
+
+
 # 🖎 Compare e discuta os resultados obtidos em 3.1 e 3.4.
+
+
+# Dados:
+
+# Variable: accel_magnitude, Outliers: 1103326, Total: 3930798, Density: 28.07%
+# Variable: gyro_magnitude, Outliers: 160794, Total: 3930798, Density: 4.09%
+# Variable: magneto_magnitude, Outliers: 174273, Total: 3930798, Density: 4.43%
+
+# Variable: accel_magnitude, k=3: Outliers detected: 85688
+# Variable: accel_magnitude, k=3.5: Outliers detected: 57721
+# Variable: accel_magnitude, k=4: Outliers detected: 40641
+# Variable: gyro_magnitude, k=3: Outliers detected: 72113
+# Variable: gyro_magnitude, k=3.5: Outliers detected: 42708
+# Variable: gyro_magnitude, k=4: Outliers detected: 23096
+# Variable: magneto_magnitude, k=3: Outliers detected: 18698
+# Variable: magneto_magnitude, k=3.5: Outliers detected: 6631
+# Variable: magneto_magnitude, k=4: Outliers detected: 3063
+
+
 # 🖮 Elabore uma rotina que implemente o algoritmo K-means para n (valor de entrada) clusters.
 # 🖎 Determine os outliers no dataset transformado usando o  k-means. Experimente k clusters igual ao número de labels e compare com os resultados obtidos em 3.4. Ilustre graficamente os resultados usando plots 3D.  
 # Bónus: poderá realizar um estudo análogo usando o algoritmo DBSCAN (sugere-se que recorra à biblioteca sklearn) 
